@@ -156,7 +156,7 @@ def create_overlay_pdf(data, output_path, page_num=1):
 def draw_signatures(c, data):
     """Draw signatures and dates at the bottom of the page"""
     
-    sig_line_y = convert_y(802.5)  # Moved up from 805
+    sig_line_y = convert_y(800)  # Moved up from 805
     sig_width = 140
     sig_height = 45
     
@@ -177,7 +177,7 @@ def draw_signatures(c, data):
     # Hirer date
     hirer_date = data.get('hirer_sig_date', '')
     if hirer_date:
-        c.drawString(215, sig_line_y + 10, hirer_date)
+        c.drawString(215, sig_line_y + 15, hirer_date)
     
     # Lessor signature (right side)
     lessor_sig = data.get('lessor_signature')
