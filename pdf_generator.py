@@ -177,7 +177,7 @@ def draw_signatures(c, data):
     # Hirer date
     hirer_date = data.get('hirer_sig_date', '')
     if hirer_date:
-        c.drawString(215, sig_line_y + 5, hirer_date)
+        c.drawString(215, sig_line_y, hirer_date)
     
     # Lessor signature (right side)
     lessor_sig = data.get('lessor_signature')
@@ -196,7 +196,7 @@ def draw_signatures(c, data):
     # Lessor date
     lessor_date = data.get('lessor_sig_date', '')
     if lessor_date:
-        c.drawString(493, sig_line_y + 5, lessor_date)
+        c.drawString(493, sig_line_y, lessor_date)
 
 def generate_hire_agreement_pdf_mobile(data, output_path, template_path=None):
     """Generate the PCO Hire Agreement PDF - Mobile Version"""
