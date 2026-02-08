@@ -50,10 +50,10 @@ def create_overlay_pdf(data, output_path, page_num=1):
         # ===== PAGE 1: Insurance & Deposit Details =====
         
         # Insurance Table
-        draw_cell_text(c, data.get('insurance_provider', ''), 477, 505)
-        draw_cell_text(c, data.get('policy_start', ''), 505, 533)
-        draw_cell_text(c, data.get('policy_expiry', ''), 533, 561)
-        draw_cell_text(c, data.get('cover_level', ''), 561, 589)
+        draw_cell_text(c, data.get('insurance_provider', ''), 482, 510)
+        draw_cell_text(c, data.get('policy_start', ''), 510, 538)
+        draw_cell_text(c, data.get('policy_expiry', ''), 538, 566)
+        draw_cell_text(c, data.get('cover_level', ''), 566, 594)
         
         # Deposit Table
         draw_cell_text(c, data.get('deposit_amount', ''), 617, 645)
