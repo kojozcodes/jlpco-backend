@@ -1,7 +1,7 @@
 """
 PDF Generator - Mobile Version
-UPDATED: Fixed positioning based on actual template
-Support for 3 new fields (Email, Phone Number, PCO Badge Number)
+UPDATED: Support for 3 new fields (Email, Phone Number, PCO Badge Number)
+Page 2 field positions adjusted accordingly
 """
 
 import os
@@ -18,7 +18,7 @@ PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 
 # Value column position
-VALUE_COLUMN_X = 460  # Adjusted based on screenshots
+VALUE_COLUMN_X = 233.6
 
 def convert_y(top_from_top):
     """Convert y coordinate from 'top from top of page' to reportlab's bottom-left origin"""
@@ -49,16 +49,16 @@ def create_overlay_pdf(data, output_path, page_num=1):
     if page_num == 1:
         # ===== PAGE 1: Insurance & Deposit Details =====
         
-        # Insurance Table (rows are ~55pt apart, starting from ~217)
-        draw_cell_text(c, data.get('insurance_provider', ''), 217, 245)
-        draw_cell_text(c, data.get('policy_start', ''), 272, 300)
-        draw_cell_text(c, data.get('policy_expiry', ''), 327, 355)
-        draw_cell_text(c, data.get('cover_level', ''), 382, 410)
+        # Insurance Table
+        draw_cell_text(c, data.get('insurance_provider', ''), 477, 505)
+        draw_cell_text(c, data.get('policy_start', ''), 505, 533)
+        draw_cell_text(c, data.get('policy_expiry', ''), 533, 561)
+        draw_cell_text(c, data.get('cover_level', ''), 561, 589)
         
-        # Deposit Table (starts around ~497)
-        draw_cell_text(c, data.get('deposit_amount', ''), 497, 525)
-        draw_cell_text(c, data.get('deposit_date', ''), 552, 580)
-        draw_cell_text(c, data.get('deposit_payment_type', ''), 607, 635)
+        # Deposit Table
+        draw_cell_text(c, data.get('deposit_amount', ''), 617, 645)
+        draw_cell_text(c, data.get('deposit_date', ''), 645, 673)
+        draw_cell_text(c, data.get('deposit_payment_type', ''), 673, 701)
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -66,35 +66,34 @@ def create_overlay_pdf(data, output_path, page_num=1):
     elif page_num == 2:
         # ===== PAGE 2: Hirer & Vehicle Details (WITH 3 NEW FIELDS) =====
         
-        # Hirer Table - Based on screenshot analysis
-        # Starting position appears to be around ~164
-        draw_cell_text(c, data.get('full_name', ''), 164, 192)
-        draw_cell_text(c, data.get('dob', ''), 210, 238)
+        # Hirer Table - UPDATED positions for new template
+        draw_cell_text(c, data.get('full_name', ''), 314, 342)
+        draw_cell_text(c, data.get('dob', ''), 342, 370)
         
-        # Address (multi-line handling)
+        # Address (same as before)
         address = data.get('address', '')
         if address:
             lines = address.replace('\n', ', ').split(', ')
             address_text = ', '.join([l.strip() for l in lines if l.strip()])
             if len(address_text) > 60:
                 address_text = address_text[:57] + '...'
-            draw_cell_text(c, address_text, 256, 302)
+            draw_cell_text(c, address_text, 370, 398)
         
-        # ✅ NEW FIELDS (Email, Phone, PCO Badge)
-        draw_cell_text(c, data.get('email', ''), 330, 358)
-        draw_cell_text(c, data.get('phone_number', ''), 376, 404)
-        draw_cell_text(c, data.get('pco_badge_number', ''), 422, 450)
+        # ✅ NEW FIELDS (after Address)
+        draw_cell_text(c, data.get('email', ''), 398, 426)              # Email
+        draw_cell_text(c, data.get('phone_number', ''), 426, 454)       # Phone Number  
+        draw_cell_text(c, data.get('pco_badge_number', ''), 454, 482)   # PCO Badge Number
         
-        # Existing fields (Licence Number, Expiry, NI)
-        draw_cell_text(c, data.get('licence_number', ''), 468, 496)
-        draw_cell_text(c, data.get('licence_expiry', ''), 514, 542)
-        draw_cell_text(c, data.get('ni_number', ''), 560, 588)
+        # Existing fields (shifted down by 3 rows = 84 points)
+        draw_cell_text(c, data.get('licence_number', ''), 482, 510)
+        draw_cell_text(c, data.get('licence_expiry', ''), 510, 538)
+        draw_cell_text(c, data.get('ni_number', ''), 538, 566)
         
-        # Vehicle Table (starts around ~663)
-        draw_cell_text(c, data.get('vehicle_reg', ''), 663, 691)
-        draw_cell_text(c, data.get('make_model', ''), 709, 737)
-        draw_cell_text(c, data.get('vin_number', ''), 755, 783)
-        draw_cell_text(c, data.get('hire_start', ''), 801, 829)
+        # Vehicle Table (shifted down by 3 rows = 84 points)
+        draw_cell_text(c, data.get('vehicle_reg', ''), 594, 622)
+        draw_cell_text(c, data.get('make_model', ''), 622, 650)
+        draw_cell_text(c, data.get('vin_number', ''), 650, 678)
+        draw_cell_text(c, data.get('hire_start', ''), 678, 706)
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -139,21 +138,21 @@ def create_overlay_pdf(data, output_path, page_num=1):
             c.setFont("Helvetica", 10)
             c.setLineWidth(1)
         
-        # Damage Notes (3 lines starting around y=54)
+        # Damage Notes
         damage_notes = data.get('damage_notes', '')
         if damage_notes:
             lines = damage_notes.split('\n')
-            y_positions = [convert_y(54), convert_y(78), convert_y(102)]
+            y_positions = [convert_y(415), convert_y(439), convert_y(463)]
             for i, line in enumerate(lines[:3]):
                 if line.strip():
-                    c.drawString(92, y_positions[i], line.strip()[:85])
+                    c.drawString(50, y_positions[i], line.strip()[:65])
         
-        # Equipment fields (based on screenshot, x positions vary)
-        c.drawString(255, convert_y(207), data.get('wheel_locking_nut', ''))
-        c.drawString(285, convert_y(243), data.get('immobiliser_installed', ''))
-        c.drawString(270, convert_y(279), data.get('dashcam_installed', ''))
-        c.drawString(310, convert_y(315), data.get('dashcam_serial', ''))
-        c.drawString(258, convert_y(351), data.get('puncture_repair_kit', ''))
+        # Equipment fields
+        c.drawString(170, convert_y(496), data.get('wheel_locking_nut', ''))
+        c.drawString(190, convert_y(512), data.get('immobiliser_installed', ''))
+        c.drawString(185, convert_y(528), data.get('dashcam_installed', ''))
+        c.drawString(210, convert_y(544), data.get('dashcam_serial', ''))
+        c.drawString(173, convert_y(560), data.get('puncture_repair_kit', ''))
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -174,7 +173,7 @@ def draw_signatures(c, data):
         temp_path = save_pil_image_to_temp(hirer_sig)
         if temp_path:
             try:
-                c.drawImage(temp_path, 100, sig_line_y, width=sig_width, height=sig_height, 
+                c.drawImage(temp_path, 40, sig_line_y, width=sig_width, height=sig_height, 
                            preserveAspectRatio=True, mask='auto')
             except:
                 pass
@@ -185,7 +184,7 @@ def draw_signatures(c, data):
     # Hirer date
     hirer_date = data.get('hirer_sig_date', '')
     if hirer_date:
-        c.drawString(360, sig_line_y + 35, hirer_date)
+        c.drawString(215, sig_line_y, hirer_date)
     
     # Lessor signature (right side)
     lessor_sig = data.get('lessor_signature')
@@ -193,7 +192,7 @@ def draw_signatures(c, data):
         temp_path = save_pil_image_to_temp(lessor_sig)
         if temp_path:
             try:
-                c.drawImage(temp_path, 600, sig_line_y, width=sig_width, height=sig_height,
+                c.drawImage(temp_path, 320, sig_line_y, width=sig_width, height=sig_height,
                            preserveAspectRatio=True, mask='auto')
             except:
                 pass
@@ -204,7 +203,7 @@ def draw_signatures(c, data):
     # Lessor date
     lessor_date = data.get('lessor_sig_date', '')
     if lessor_date:
-        c.drawString(920, sig_line_y + 35, lessor_date)
+        c.drawString(493, sig_line_y, lessor_date)
 
 def generate_hire_agreement_pdf_mobile(data, output_path, template_path=None):
     """Generate the PCO Hire Agreement PDF - Mobile Version"""
@@ -212,8 +211,8 @@ def generate_hire_agreement_pdf_mobile(data, output_path, template_path=None):
     # Find template PDF (prioritize template_updated.pdf)
     if template_path is None:
         possible_paths = [
-            'template_updated.pdf',
-            'template.pdf',
+            'template_updated.pdf',  # ✅ NEW template first
+            'template.pdf',          # Fallback to old
             '/app/template_updated.pdf',
             '/app/template.pdf',
             os.path.join(os.path.dirname(__file__), 'template_updated.pdf'),
