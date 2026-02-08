@@ -173,7 +173,7 @@ def draw_signatures(c, data):
         temp_path = save_pil_image_to_temp(hirer_sig)
         if temp_path:
             try:
-                c.drawImage(temp_path, 40, sig_line_y, width=sig_width, height=sig_height, 
+                c.drawImage(temp_path, 35, sig_line_y, width=sig_width, height=sig_height, 
                            preserveAspectRatio=True, mask='auto')
             except:
                 pass
@@ -184,7 +184,7 @@ def draw_signatures(c, data):
     # Hirer date
     hirer_date = data.get('hirer_sig_date', '')
     if hirer_date:
-        c.drawString(210, sig_line_y, hirer_date)
+        c.drawString(200, sig_line_y, hirer_date)
     
     # Lessor signature (right side)
     lessor_sig = data.get('lessor_signature')
@@ -192,7 +192,7 @@ def draw_signatures(c, data):
         temp_path = save_pil_image_to_temp(lessor_sig)
         if temp_path:
             try:
-                c.drawImage(temp_path, 320, sig_line_y, width=sig_width, height=sig_height,
+                c.drawImage(temp_path, 300, sig_line_y, width=sig_width, height=sig_height,
                            preserveAspectRatio=True, mask='auto')
             except:
                 pass
@@ -203,7 +203,7 @@ def draw_signatures(c, data):
     # Lessor date
     lessor_date = data.get('lessor_sig_date', '')
     if lessor_date:
-        c.drawString(490, sig_line_y, lessor_date)
+        c.drawString(485, sig_line_y, lessor_date)
 
 def generate_hire_agreement_pdf_mobile(data, output_path, template_path=None):
     """Generate the PCO Hire Agreement PDF - Mobile Version"""
