@@ -18,7 +18,7 @@ PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 
 # Value column position
-VALUE_COLUMN_X = 238
+VALUE_COLUMN_X = 237
 
 def convert_y(top_from_top):
     """Convert y coordinate from 'top from top of page' to reportlab's bottom-left origin"""
@@ -51,14 +51,14 @@ def create_overlay_pdf(data, output_path, page_num=1):
         
         # Insurance Table
         draw_cell_text(c, data.get('insurance_provider', ''), 482, 510)
-        draw_cell_text(c, data.get('policy_start', ''), 510, 538)
-        draw_cell_text(c, data.get('policy_expiry', ''), 538, 566)
-        draw_cell_text(c, data.get('cover_level', ''), 566, 594)
+        draw_cell_text(c, data.get('policy_start', ''), 509, 537)
+        draw_cell_text(c, data.get('policy_expiry', ''), 537, 565)
+        draw_cell_text(c, data.get('cover_level', ''), 565, 593)
         
         # Deposit Table
-        draw_cell_text(c, data.get('deposit_amount', ''), 618, 646)
-        draw_cell_text(c, data.get('deposit_date', ''), 646, 674)
-        draw_cell_text(c, data.get('deposit_payment_type', ''), 674, 702)
+        draw_cell_text(c, data.get('deposit_amount', ''), 619, 647)
+        draw_cell_text(c, data.get('deposit_date', ''), 647, 675)
+        draw_cell_text(c, data.get('deposit_payment_type', ''), 675, 703)
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -90,10 +90,10 @@ def create_overlay_pdf(data, output_path, page_num=1):
         draw_cell_text(c, data.get('ni_number', ''), 531, 559)
         
         # Vehicle Table (shifted down by 3 rows = 84 points)
-        draw_cell_text(c, data.get('vehicle_reg', ''), 587, 615)
-        draw_cell_text(c, data.get('make_model', ''), 614, 640)
-        draw_cell_text(c, data.get('vin_number', ''), 642, 670)
-        draw_cell_text(c, data.get('hire_start', ''), 669, 697)
+        draw_cell_text(c, data.get('vehicle_reg', ''), 586, 614)
+        draw_cell_text(c, data.get('make_model', ''), 613, 639)
+        draw_cell_text(c, data.get('vin_number', ''), 641, 669)
+        draw_cell_text(c, data.get('hire_start', ''), 668, 696)
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -142,17 +142,17 @@ def create_overlay_pdf(data, output_path, page_num=1):
         damage_notes = data.get('damage_notes', '')
         if damage_notes:
             lines = damage_notes.split('\n')
-            y_positions = [convert_y(410), convert_y(434), convert_y(458)]
+            y_positions = [convert_y(405), convert_y(434), convert_y(458)]
             for i, line in enumerate(lines[:3]):
                 if line.strip():
                     c.drawString(50, y_positions[i], line.strip()[:65])
         
         # Equipment fields
-        c.drawString(170, convert_y(486), data.get('wheel_locking_nut', ''))
-        c.drawString(190, convert_y(492), data.get('immobiliser_installed', ''))
-        c.drawString(185, convert_y(510), data.get('dashcam_installed', ''))
+        c.drawString(170, convert_y(481), data.get('wheel_locking_nut', ''))
+        c.drawString(190, convert_y(497), data.get('immobiliser_installed', ''))
+        c.drawString(185, convert_y(515), data.get('dashcam_installed', ''))
         c.drawString(210, convert_y(534), data.get('dashcam_serial', ''))
-        c.drawString(173, convert_y(550), data.get('puncture_repair_kit', ''))
+        c.drawString(173, convert_y(551), data.get('puncture_repair_kit', ''))
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -163,7 +163,7 @@ def create_overlay_pdf(data, output_path, page_num=1):
 def draw_signatures(c, data):
     """Draw signatures and dates at the bottom of the page"""
     
-    sig_line_y = convert_y(795)
+    sig_line_y = convert_y(785)
     sig_width = 140
     sig_height = 45
     
