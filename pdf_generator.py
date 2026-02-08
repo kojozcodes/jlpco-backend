@@ -18,7 +18,7 @@ PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 
 # Value column position
-VALUE_COLUMN_X = 240
+VALUE_COLUMN_X = 238
 
 def convert_y(top_from_top):
     """Convert y coordinate from 'top from top of page' to reportlab's bottom-left origin"""
@@ -86,14 +86,14 @@ def create_overlay_pdf(data, output_path, page_num=1):
         
         # Existing fields (shifted down by 3 rows = 84 points)
         draw_cell_text(c, data.get('licence_number', ''), 483, 511)
-        draw_cell_text(c, data.get('licence_expiry', ''), 508, 536)
-        draw_cell_text(c, data.get('ni_number', ''), 533, 561)
+        draw_cell_text(c, data.get('licence_expiry', ''), 506, 534)
+        draw_cell_text(c, data.get('ni_number', ''), 531, 559)
         
         # Vehicle Table (shifted down by 3 rows = 84 points)
-        draw_cell_text(c, data.get('vehicle_reg', ''), 589, 617)
-        draw_cell_text(c, data.get('make_model', ''), 617, 643)
-        draw_cell_text(c, data.get('vin_number', ''), 643, 671)
-        draw_cell_text(c, data.get('hire_start', ''), 671, 699)
+        draw_cell_text(c, data.get('vehicle_reg', ''), 587, 615)
+        draw_cell_text(c, data.get('make_model', ''), 614, 640)
+        draw_cell_text(c, data.get('vin_number', ''), 642, 670)
+        draw_cell_text(c, data.get('hire_start', ''), 669, 697)
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -142,17 +142,17 @@ def create_overlay_pdf(data, output_path, page_num=1):
         damage_notes = data.get('damage_notes', '')
         if damage_notes:
             lines = damage_notes.split('\n')
-            y_positions = [convert_y(415), convert_y(439), convert_y(463)]
+            y_positions = [convert_y(410), convert_y(434), convert_y(458)]
             for i, line in enumerate(lines[:3]):
                 if line.strip():
                     c.drawString(50, y_positions[i], line.strip()[:65])
         
         # Equipment fields
-        c.drawString(170, convert_y(496), data.get('wheel_locking_nut', ''))
-        c.drawString(190, convert_y(512), data.get('immobiliser_installed', ''))
-        c.drawString(185, convert_y(528), data.get('dashcam_installed', ''))
-        c.drawString(210, convert_y(544), data.get('dashcam_serial', ''))
-        c.drawString(173, convert_y(560), data.get('puncture_repair_kit', ''))
+        c.drawString(170, convert_y(486), data.get('wheel_locking_nut', ''))
+        c.drawString(190, convert_y(492), data.get('immobiliser_installed', ''))
+        c.drawString(185, convert_y(510), data.get('dashcam_installed', ''))
+        c.drawString(210, convert_y(534), data.get('dashcam_serial', ''))
+        c.drawString(173, convert_y(550), data.get('puncture_repair_kit', ''))
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -163,7 +163,7 @@ def create_overlay_pdf(data, output_path, page_num=1):
 def draw_signatures(c, data):
     """Draw signatures and dates at the bottom of the page"""
     
-    sig_line_y = convert_y(800)
+    sig_line_y = convert_y(795)
     sig_width = 140
     sig_height = 45
     
@@ -184,7 +184,7 @@ def draw_signatures(c, data):
     # Hirer date
     hirer_date = data.get('hirer_sig_date', '')
     if hirer_date:
-        c.drawString(215, sig_line_y, hirer_date)
+        c.drawString(210, sig_line_y, hirer_date)
     
     # Lessor signature (right side)
     lessor_sig = data.get('lessor_signature')
@@ -203,7 +203,7 @@ def draw_signatures(c, data):
     # Lessor date
     lessor_date = data.get('lessor_sig_date', '')
     if lessor_date:
-        c.drawString(493, sig_line_y, lessor_date)
+        c.drawString(490, sig_line_y, lessor_date)
 
 def generate_hire_agreement_pdf_mobile(data, output_path, template_path=None):
     """Generate the PCO Hire Agreement PDF - Mobile Version"""
