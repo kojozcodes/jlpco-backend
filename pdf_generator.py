@@ -18,7 +18,7 @@ PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 
 # Value column position
-VALUE_COLUMN_X = 235
+VALUE_COLUMN_X = 240
 
 def convert_y(top_from_top):
     """Convert y coordinate from 'top from top of page' to reportlab's bottom-left origin"""
@@ -68,7 +68,7 @@ def create_overlay_pdf(data, output_path, page_num=1):
         
         # Hirer Table - UPDATED positions for new template
         draw_cell_text(c, data.get('full_name', ''), 312, 340)
-        draw_cell_text(c, data.get('dob', ''), 340, 368)
+        draw_cell_text(c, data.get('dob', ''), 339, 367)
         
         # Address (same as before)
         address = data.get('address', '')
@@ -77,23 +77,23 @@ def create_overlay_pdf(data, output_path, page_num=1):
             address_text = ', '.join([l.strip() for l in lines if l.strip()])
             if len(address_text) > 60:
                 address_text = address_text[:57] + '...'
-            draw_cell_text(c, address_text, 368, 396)
+            draw_cell_text(c, address_text, 367, 395)
         
         # ✅ NEW FIELDS (after Address)
         draw_cell_text(c, data.get('email', ''), 405, 430)              # Email
-        draw_cell_text(c, data.get('phone_number', ''), 430, 460)       # Phone Number  
-        draw_cell_text(c, data.get('pco_badge_number', ''), 460, 486)   # PCO Badge Number
+        draw_cell_text(c, data.get('phone_number', ''), 432, 462)       # Phone Number  
+        draw_cell_text(c, data.get('pco_badge_number', ''), 458, 484)   # PCO Badge Number
         
         # Existing fields (shifted down by 3 rows = 84 points)
-        draw_cell_text(c, data.get('licence_number', ''), 482, 510)
-        draw_cell_text(c, data.get('licence_expiry', ''), 510, 538)
-        draw_cell_text(c, data.get('ni_number', ''), 538, 566)
+        draw_cell_text(c, data.get('licence_number', ''), 483, 511)
+        draw_cell_text(c, data.get('licence_expiry', ''), 508, 536)
+        draw_cell_text(c, data.get('ni_number', ''), 533, 561)
         
         # Vehicle Table (shifted down by 3 rows = 84 points)
-        draw_cell_text(c, data.get('vehicle_reg', ''), 594, 622)
-        draw_cell_text(c, data.get('make_model', ''), 622, 650)
-        draw_cell_text(c, data.get('vin_number', ''), 650, 678)
-        draw_cell_text(c, data.get('hire_start', ''), 678, 706)
+        draw_cell_text(c, data.get('vehicle_reg', ''), 589, 617)
+        draw_cell_text(c, data.get('make_model', ''), 617, 643)
+        draw_cell_text(c, data.get('vin_number', ''), 643, 671)
+        draw_cell_text(c, data.get('hire_start', ''), 671, 699)
         
         # Signatures at bottom
         draw_signatures(c, data)
