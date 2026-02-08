@@ -18,7 +18,7 @@ PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 
 # Value column position
-VALUE_COLUMN_X = 235.6
+VALUE_COLUMN_X = 235
 
 def convert_y(top_from_top):
     """Convert y coordinate from 'top from top of page' to reportlab's bottom-left origin"""
@@ -56,9 +56,9 @@ def create_overlay_pdf(data, output_path, page_num=1):
         draw_cell_text(c, data.get('cover_level', ''), 566, 594)
         
         # Deposit Table
-        draw_cell_text(c, data.get('deposit_amount', ''), 619, 647)
-        draw_cell_text(c, data.get('deposit_date', ''), 647, 675)
-        draw_cell_text(c, data.get('deposit_payment_type', ''), 675, 703)
+        draw_cell_text(c, data.get('deposit_amount', ''), 618, 646)
+        draw_cell_text(c, data.get('deposit_date', ''), 646, 674)
+        draw_cell_text(c, data.get('deposit_payment_type', ''), 674, 702)
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -67,8 +67,8 @@ def create_overlay_pdf(data, output_path, page_num=1):
         # ===== PAGE 2: Hirer & Vehicle Details (WITH 3 NEW FIELDS) =====
         
         # Hirer Table - UPDATED positions for new template
-        draw_cell_text(c, data.get('full_name', ''), 314, 342)
-        draw_cell_text(c, data.get('dob', ''), 342, 370)
+        draw_cell_text(c, data.get('full_name', ''), 312, 340)
+        draw_cell_text(c, data.get('dob', ''), 340, 368)
         
         # Address (same as before)
         address = data.get('address', '')
@@ -77,12 +77,12 @@ def create_overlay_pdf(data, output_path, page_num=1):
             address_text = ', '.join([l.strip() for l in lines if l.strip()])
             if len(address_text) > 60:
                 address_text = address_text[:57] + '...'
-            draw_cell_text(c, address_text, 370, 398)
+            draw_cell_text(c, address_text, 368, 396)
         
         # ✅ NEW FIELDS (after Address)
-        draw_cell_text(c, data.get('email', ''), 398, 426)              # Email
-        draw_cell_text(c, data.get('phone_number', ''), 426, 454)       # Phone Number  
-        draw_cell_text(c, data.get('pco_badge_number', ''), 454, 482)   # PCO Badge Number
+        draw_cell_text(c, data.get('email', ''), 405, 430)              # Email
+        draw_cell_text(c, data.get('phone_number', ''), 430, 460)       # Phone Number  
+        draw_cell_text(c, data.get('pco_badge_number', ''), 460, 486)   # PCO Badge Number
         
         # Existing fields (shifted down by 3 rows = 84 points)
         draw_cell_text(c, data.get('licence_number', ''), 482, 510)
