@@ -1,6 +1,7 @@
 """
 PDF Generator - Mobile Version
-Modified to work with PIL Images instead of QImage
+UPDATED: Support for 3 new fields (Email, Phone Number, PCO Badge Number)
+Page 2 field positions adjusted accordingly
 """
 
 import os
@@ -63,30 +64,36 @@ def create_overlay_pdf(data, output_path, page_num=1):
         draw_signatures(c, data)
         
     elif page_num == 2:
-        # ===== PAGE 2: Hirer & Vehicle Details =====
+        # ===== PAGE 2: Hirer & Vehicle Details (WITH 3 NEW FIELDS) =====
         
-        # Hirer Table
+        # Hirer Table - UPDATED positions for new template
         draw_cell_text(c, data.get('full_name', ''), 314, 342)
         draw_cell_text(c, data.get('dob', ''), 342, 370)
         
-        # Address
+        # Address (same as before)
         address = data.get('address', '')
         if address:
             lines = address.replace('\n', ', ').split(', ')
             address_text = ', '.join([l.strip() for l in lines if l.strip()])
             if len(address_text) > 60:
                 address_text = address_text[:57] + '...'
-            draw_cell_text(c, address_text, 370, 409.4)
+            draw_cell_text(c, address_text, 370, 398)
         
-        draw_cell_text(c, data.get('licence_number', ''), 408, 433)
-        draw_cell_text(c, data.get('licence_expiry', ''), 427, 447)
-        draw_cell_text(c, data.get('ni_number', ''), 454, 482)
+        # ✅ NEW FIELDS (after Address)
+        draw_cell_text(c, data.get('email', ''), 398, 426)              # Email
+        draw_cell_text(c, data.get('phone_number', ''), 426, 454)       # Phone Number  
+        draw_cell_text(c, data.get('pco_badge_number', ''), 454, 482)   # PCO Badge Number
         
-        # Vehicle Table
-        draw_cell_text(c, data.get('vehicle_reg', ''), 510, 538)
-        draw_cell_text(c, data.get('make_model', ''), 538, 566)
-        draw_cell_text(c, data.get('vin_number', ''), 566, 594)
-        draw_cell_text(c, data.get('hire_start', ''), 594, 622)
+        # Existing fields (shifted down by 3 rows = 84 points)
+        draw_cell_text(c, data.get('licence_number', ''), 482, 510)
+        draw_cell_text(c, data.get('licence_expiry', ''), 510, 538)
+        draw_cell_text(c, data.get('ni_number', ''), 538, 566)
+        
+        # Vehicle Table (shifted down by 3 rows = 84 points)
+        draw_cell_text(c, data.get('vehicle_reg', ''), 594, 622)
+        draw_cell_text(c, data.get('make_model', ''), 622, 650)
+        draw_cell_text(c, data.get('vin_number', ''), 650, 678)
+        draw_cell_text(c, data.get('hire_start', ''), 678, 706)
         
         # Signatures at bottom
         draw_signatures(c, data)
@@ -156,7 +163,7 @@ def create_overlay_pdf(data, output_path, page_num=1):
 def draw_signatures(c, data):
     """Draw signatures and dates at the bottom of the page"""
     
-    sig_line_y = convert_y(800)  # Moved up from 805
+    sig_line_y = convert_y(800)
     sig_width = 140
     sig_height = 45
     
@@ -201,21 +208,25 @@ def draw_signatures(c, data):
 def generate_hire_agreement_pdf_mobile(data, output_path, template_path=None):
     """Generate the PCO Hire Agreement PDF - Mobile Version"""
     
-    # Find template PDF
+    # Find template PDF (prioritize template_updated.pdf)
     if template_path is None:
         possible_paths = [
-            'template.pdf',
+            'template_updated.pdf',  # ✅ NEW template first
+            'template.pdf',          # Fallback to old
+            '/app/template_updated.pdf',
             '/app/template.pdf',
+            os.path.join(os.path.dirname(__file__), 'template_updated.pdf'),
             os.path.join(os.path.dirname(__file__), 'template.pdf'),
         ]
         
         for path in possible_paths:
             if os.path.exists(path):
                 template_path = path
+                print(f"✅ Using template: {path}")
                 break
         
         if template_path is None:
-            raise FileNotFoundError("Template PDF not found")
+            raise FileNotFoundError("Template PDF not found. Please upload template_updated.pdf to backend folder.")
     
     # Read the template PDF
     template_reader = PdfReader(template_path)
