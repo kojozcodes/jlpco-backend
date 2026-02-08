@@ -18,7 +18,7 @@ PAGE_WIDTH = 595.28
 PAGE_HEIGHT = 841.89
 
 # Value column position
-VALUE_COLUMN_X = 233.6
+VALUE_COLUMN_X = 235.6
 
 def convert_y(top_from_top):
     """Convert y coordinate from 'top from top of page' to reportlab's bottom-left origin"""
@@ -56,9 +56,9 @@ def create_overlay_pdf(data, output_path, page_num=1):
         draw_cell_text(c, data.get('cover_level', ''), 566, 594)
         
         # Deposit Table
-        draw_cell_text(c, data.get('deposit_amount', ''), 617, 645)
-        draw_cell_text(c, data.get('deposit_date', ''), 645, 673)
-        draw_cell_text(c, data.get('deposit_payment_type', ''), 673, 701)
+        draw_cell_text(c, data.get('deposit_amount', ''), 619, 647)
+        draw_cell_text(c, data.get('deposit_date', ''), 647, 675)
+        draw_cell_text(c, data.get('deposit_payment_type', ''), 675, 703)
         
         # Signatures at bottom
         draw_signatures(c, data)
