@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from PIL import Image
 from pdf_generator import generate_hire_agreement_pdf_mobile
 import traceback
-import hashlib
+import bcrypt
 import secrets
 import jwt
 
@@ -38,14 +38,9 @@ if not ADMIN_PASSWORD_HASH:
 TOKEN_EXPIRATION_HOURS = 8
 
 
-def hash_password(password):
-    """Hash password using SHA-256"""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-
-def verify_password(password, password_hash):
-    """Verify password against hash"""
-    return hash_password(password) == password_hash
+def verify_password(password, stored_hash):
+    """Verify password against bcrypt hash"""
+    return bcrypt.checkpw(password.encode(), stored_hash.encode())
 
 
 def generate_token(user_id='admin'):
@@ -247,8 +242,7 @@ def generate_pdf():
         print(traceback.format_exc())
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': 'Failed to generate PDF. Please try again.'
         }), 500
 
 
