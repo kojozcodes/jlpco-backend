@@ -16,9 +16,11 @@ import traceback
 import bcrypt
 import secrets
 import jwt
+from functools import wraps
 
 app = Flask(__name__)
-CORS(app)
+ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '').split(',')
+CORS(app, origins=ALLOWED_ORIGINS)
 
 # SECURITY CONFIGURATION
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
@@ -67,6 +69,7 @@ def verify_token(token):
 
 def require_auth(f):
     """Decorator to require authentication"""
+    @wraps(f)
     def decorated_function(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
         
@@ -86,7 +89,6 @@ def require_auth(f):
         
         return f(*args, **kwargs)
     
-    decorated_function.__name__ = f.__name__
     return decorated_function
 
 
