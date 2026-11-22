@@ -166,10 +166,14 @@ def _draw_signatures(c, data, save_image):
         path = save_image(signature)
         if not path:
             continue
+        # Centred over its own line, and the same size in every slot. The
+        # slots are different widths, so a signature drawn to fill each one
+        # would come out bigger for the lessor than the hirer.
+        box_x = x0 + ((x1 - x0) - SIGNATURE_WIDTH) / 2
         try:
-            c.drawImage(path, x0 + 1, SIGNATURE_LINE_Y + 2,
+            c.drawImage(path, box_x, SIGNATURE_LINE_Y + 2,
                         width=SIGNATURE_WIDTH, height=SIGNATURE_HEIGHT,
-                        preserveAspectRatio=True, anchor='sw', mask='auto')
+                        preserveAspectRatio=True, anchor='s', mask='auto')
         except Exception:
             pass
         finally:
