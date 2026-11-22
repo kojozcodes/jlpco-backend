@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import tempfile
+import uuid
 import base64
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
@@ -314,17 +315,49 @@ def list_agreements():
         }), 503
 
     try:
-        return jsonify({
-            'success': True,
-            'agreements': db.list_agreements(
-                search=request.args.get('search', ''),
-                limit=request.args.get('limit', 50),
-                offset=request.args.get('offset', 0),
-            )
-        })
+        before = page_cursor(request.args.get('before'), request.args.get('before_id'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Invalid page.'}), 400
+
+    try:
+        rows, has_more = db.list_agreements(
+            search=request.args.get('search', ''),
+            limit=page_size(request.args.get('limit')),
+            before=before,
+        )
+        return jsonify({'success': True, 'agreements': rows, 'has_more': has_more})
     except Exception as e:
         log_error("Error listing agreements", e)
         return jsonify({'success': False, 'error': 'Could not load history.'}), 500
+
+
+PAGE_SIZE = 50
+MAX_PAGE_SIZE = 200
+
+
+def page_size(value):
+    """How many agreements were asked for, within bounds; the default if unreadable."""
+    try:
+        return max(1, min(int(value), MAX_PAGE_SIZE))
+    except (TypeError, ValueError):
+        return PAGE_SIZE
+
+
+def page_cursor(created_at, agreement_id):
+    """
+    The (created_at, id) a page of History starts after, or None for the first
+    page. Both come back from the client exactly as the list sent them out.
+
+    Checked here rather than handed to Postgres as given. A malformed value
+    would otherwise fail inside the query as a 500, and its text would end up
+    in the error logged.
+    """
+    if not created_at and not agreement_id:
+        return None
+    when = datetime.fromisoformat(created_at)
+    if when.tzinfo is None:
+        raise ValueError('page cursor has no timezone')
+    return when, str(uuid.UUID(agreement_id))
 
 
 @app.route('/api/agreements/<agreement_id>/pdf', methods=['GET'])

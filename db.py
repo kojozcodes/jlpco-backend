@@ -178,18 +178,34 @@ def save_agreement(form_data, pdf_bytes, filename, created_by='admin'):
         return None
 
 
-def list_agreements(search='', limit=50, offset=0):
-    """Most recent first. Matches on hirer name or registration."""
-    if not is_enabled():
-        return []
+def list_agreements(search='', limit=50, before=None):
+    """
+    Most recent first, one page at a time, matching on hirer name or
+    registration. Returns (rows, has_more).
 
-    where, params = '', []
+    A page is asked for by position: before is the (created_at, id) of the
+    oldest agreement already on screen, and the page is what comes after it.
+    Skipping a count of rows instead would shift whenever an agreement was
+    added or deleted between pages, showing one twice or missing one. The id
+    settles the order between agreements created in the same instant.
+
+    One row more than the page is read, only to learn whether another page
+    follows. It is not returned.
+    """
+    if not is_enabled():
+        return [], False
+
+    conditions, params = [], []
     if search.strip():
         like = f"%{search.strip().lower()}%"
-        where = ("WHERE lower(hirer_name) LIKE %s "
-                 "OR lower(vehicle_reg) LIKE %s "
-                 "OR lower(replace(vehicle_reg, ' ', '')) LIKE %s")
-        params = [like, like, like.replace(' ', '')]
+        conditions.append("(lower(hirer_name) LIKE %s "
+                          "OR lower(vehicle_reg) LIKE %s "
+                          "OR lower(replace(vehicle_reg, ' ', '')) LIKE %s)")
+        params += [like, like, like.replace(' ', '')]
+    if before:
+        conditions.append("(created_at, id) < (%s, %s)")
+        params += list(before)
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ''
 
     with connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(
@@ -197,17 +213,19 @@ def list_agreements(search='', limit=50, offset=0):
             SELECT id, created_at, hirer_name, vehicle_reg, make_model,
                    hire_start, filename, ended_at
             FROM agreements {where}
-            ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
+            ORDER BY created_at DESC, id DESC
+            LIMIT %s
             """,
-            params + [min(int(limit), 200), max(int(offset), 0)],
+            params + [limit + 1],
         )
         rows = cur.fetchall()
 
+    has_more = len(rows) > limit
+    rows = rows[:limit]
     for row in rows:
         row['created_at'] = row['created_at'].isoformat()
         row['ended_at'] = row['ended_at'].isoformat() if row['ended_at'] else None
-    return rows
+    return rows, has_more
 
 
 def get_agreement(agreement_id):
