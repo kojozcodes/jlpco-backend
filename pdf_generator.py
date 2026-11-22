@@ -47,15 +47,20 @@ NOTE_INDENT = 3.75
 # Equipment values sit just above their label's baseline.
 EQUIPMENT_BASELINE_LIFT = 0.89
 
-# Signatures are drawn this far above the footer caption they belong to.
+# The signature block is a footer, printed in the same place on every page.
+# These are the template's own columns, so a signature sits on the line it
+# belongs to rather than near it. The rule each one sits on is the line between
+# the two rows of that block, 15.35pt above the caption's baseline.
 SIGNATURE_CAPTION = 'hirer signature'
-SIGNATURE_BASELINE_LIFT = 19.09
-SIGNATURE_WIDTH = 140
-SIGNATURE_HEIGHT = 45
-HIRER_SIGNATURE_X = 30
-HIRER_DATE_X = 180
-LESSOR_SIGNATURE_X = 290
-LESSOR_DATE_X = 475
+SIGNATURE_RULE_LIFT = 15.35
+SIGNATURE_WIDTH = 108
+SIGNATURE_HEIGHT = 36
+SIGNATURE_SLOTS = (
+    (42.50, 152.75, 'hirer_signature', None),
+    (164.75, 245.00, None, 'hirer_sig_date'),
+    (262.25, 443.75, 'lessor_signature', None),
+    (455.75, 551.00, None, 'lessor_sig_date'),
+)
 
 # A tapped point on the frontend's car_diagram.png mapped onto the diagram
 # embedded in the template. Vertical framing of the two images is identical, so
@@ -372,38 +377,45 @@ def draw_equipment_fields(c, data, template_path, page_num):
 
 
 def draw_signatures(c, data, template_path=None, page_num=None):
-    """Draw signatures and dates above the footer caption on the page"""
+    """Draw signatures and dates on the footer's printed lines."""
 
-    sig_line_y = None
+    rule_y = None
     if template_path and page_num:
         caption = next((y for _, y, text in page_lines(template_path, page_num)
                         if SIGNATURE_CAPTION in text), None)
         if caption is not None:
-            sig_line_y = caption + SIGNATURE_BASELINE_LIFT
-    if sig_line_y is None:
-        sig_line_y = convert_y(785)
+            rule_y = caption + SIGNATURE_RULE_LIFT
+    if rule_y is None:
+        rule_y = convert_y(788.74)
 
-    for signature, sig_x, date, date_x in (
-        (data.get('hirer_signature'), HIRER_SIGNATURE_X,
-         data.get('hirer_sig_date', ''), HIRER_DATE_X),
-        (data.get('lessor_signature'), LESSOR_SIGNATURE_X,
-         data.get('lessor_sig_date', ''), LESSOR_DATE_X),
-    ):
-        if signature:
-            temp_path = save_pil_image_to_temp(signature)
-            if temp_path:
-                try:
-                    c.drawImage(temp_path, sig_x, sig_line_y,
-                                width=SIGNATURE_WIDTH, height=SIGNATURE_HEIGHT,
-                                preserveAspectRatio=True, mask='auto')
-                except Exception:
-                    pass
-                finally:
-                    if os.path.exists(temp_path):
-                        os.unlink(temp_path)
+    for x0, x1, signature_key, date_key in SIGNATURE_SLOTS:
+        if date_key:
+            date = data.get(date_key, '')
+            if date:
+                c.setFont("Helvetica", 10)
+                c.drawCentredString((x0 + x1) / 2, rule_y + 6, str(date))
+            continue
 
-        if date:
-            c.drawString(date_x, sig_line_y, date)
+        signature = data.get(signature_key)
+        if not signature:
+            continue
+
+        temp_path = save_pil_image_to_temp(signature)
+        if not temp_path:
+            continue
+        try:
+            # Centred on its own line, and the same size in every slot: the
+            # slots differ in width, so one scaled to fill each would print
+            # noticeably larger for the lessor than the hirer.
+            box_x = x0 + ((x1 - x0) - SIGNATURE_WIDTH) / 2
+            c.drawImage(temp_path, box_x, rule_y + 2,
+                        width=SIGNATURE_WIDTH, height=SIGNATURE_HEIGHT,
+                        preserveAspectRatio=True, anchor='s', mask='auto')
+        except Exception:
+            pass
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
 
 
 def create_overlay_pdf(data, output_path, page_num=1, template_path=None):

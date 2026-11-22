@@ -477,6 +477,36 @@ def format_date_uk(value):
         return value
 
 
+def trim_signature(image):
+    """
+    Crop the blank margin off a signature.
+
+    The pad exports the whole canvas, so someone who signs small or to one side
+    produces an image that is mostly empty. Drawn as it arrives, that margin is
+    part of the picture, so the signature prints small and off to one side of
+    its line however carefully the image is centred.
+
+    A little padding is left so strokes are not cut flush to the edge.
+    """
+    if image is None:
+        return None
+    try:
+        if image.mode != 'RGBA':
+            return image          # no transparency to measure, leave it alone
+        bbox = image.getchannel('A').getbbox()
+        if not bbox:
+            return None           # nothing was drawn
+        left, top, right, bottom = bbox
+        pad = 6
+        return image.crop((
+            max(left - pad, 0), max(top - pad, 0),
+            min(right + pad, image.width), min(bottom + pad, image.height),
+        ))
+    except Exception as e:
+        print(f"Could not trim signature: {e}")
+        return image
+
+
 def process_signature(sig_base64):
     """Convert base64 signature to PIL Image"""
     if not sig_base64:
@@ -488,8 +518,8 @@ def process_signature(sig_base64):
         
         img_data = base64.b64decode(sig_base64)
         img = Image.open(BytesIO(img_data))
-        
-        return img
+
+        return trim_signature(img)
         
     except Exception as e:
         print(f"Error processing signature: {e}")
