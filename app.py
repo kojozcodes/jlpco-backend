@@ -10,6 +10,7 @@ import tempfile
 import base64
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from PIL import Image
 from pdf_generator import (generate_hire_agreement_pdf_mobile,
                            resolve_template_path,
@@ -388,6 +389,7 @@ def end_agreement(agreement_id):
         return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
 
     ended_at = datetime.now(timezone.utc)
+    ended_local = ended_at.astimezone(UK_TIMEZONE)
     form_data = agreement.get('form_data') or {}
 
     end_data = {
@@ -395,13 +397,13 @@ def end_agreement(agreement_id):
         'vehicle_reg': agreement['vehicle_reg'],
         'make_model': agreement['make_model'],
         'hire_start': format_date_uk(form_data.get('hire_start', '')),
-        'ended_at_display': ended_at.strftime('%d/%m/%Y %H:%M'),
-        'ended_date': ended_at.strftime('%d/%m/%Y'),
+        'ended_at_display': ended_local.strftime('%d/%m/%Y %H:%M'),
+        'ended_date': ended_local.strftime('%d/%m/%Y'),
         'return_notes': data.get('return_notes', ''),
-        'deposit_amount': data.get('deposit_amount',
-                                   form_data.get('deposit_amount', '')),
-        'deposit_withheld': data.get('deposit_withheld', ''),
-        'deposit_returned': data.get('deposit_returned', ''),
+        'deposit_amount': format_money(data.get('deposit_amount',
+                                                form_data.get('deposit_amount', ''))),
+        'deposit_withheld': format_money(data.get('deposit_withheld', '')),
+        'deposit_returned': format_money(data.get('deposit_returned', '')),
         'deduction_reason': data.get('deduction_reason', ''),
     }
 
@@ -441,6 +443,23 @@ def delete_agreement(agreement_id):
 
     print(f"Agreement {agreement_id} deleted by '{request.user_id}'")
     return jsonify({'success': True})
+
+
+# The hire business runs on UK time. Timestamps are stored in UTC, which is the
+# same as UK time in winter and an hour behind it all summer, so anything shown
+# to a person is converted rather than printed raw. Otherwise a vehicle returned
+# at 3pm in July is recorded as having come back at 14:00.
+UK_TIMEZONE = ZoneInfo('Europe/London')
+
+
+def format_money(value):
+    """Money to two decimal places. Anything unparseable is left alone."""
+    if value in (None, ''):
+        return ''
+    try:
+        return f"{float(str(value).replace(',', '').strip()):.2f}"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def format_date_uk(value):
