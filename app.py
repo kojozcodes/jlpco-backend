@@ -12,6 +12,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 from PIL import Image
 from pdf_generator import generate_hire_agreement_pdf_mobile
+import db
 import traceback
 import bcrypt
 import secrets
@@ -38,6 +39,10 @@ if not ADMIN_PASSWORD_HASH:
 
 # Token expiration: 8 hours
 TOKEN_EXPIRATION_HOURS = 8
+
+# Prepare the archive. Idempotent, so it is safe for each gunicorn worker to
+# run it, and a failure here leaves agreement generation working.
+db.init_schema()
 
 
 def verify_password(password, stored_hash):
@@ -240,13 +245,21 @@ def generate_pdf():
         # personal data and the container's temp dir was never being cleared.
         try:
             with open(output_path, 'rb') as generated:
-                pdf_bytes = BytesIO(generated.read())
+                raw_pdf = generated.read()
         finally:
             if os.path.exists(output_path):
                 os.unlink(output_path)
 
+        # Archive a copy. Deliberately after the PDF exists and deliberately
+        # unable to raise: if the archive is down the operator still gets the
+        # agreement they are standing at a handover waiting for.
+        # The submitted values, not pdf_data: by that point the dates have been
+        # reformatted for printing, and DD/MM/YYYY is silently rejected by the
+        # date inputs when an agreement is reused as the basis for a new one.
+        db.save_agreement(data, raw_pdf, filename, created_by=request.user_id)
+
         return send_file(
-            pdf_bytes,
+            BytesIO(raw_pdf),
             mimetype='application/pdf',
             as_attachment=True,
             download_name=filename
@@ -259,6 +272,85 @@ def generate_pdf():
             'success': False,
             'error': 'Failed to generate PDF. Please try again.'
         }), 500
+
+
+@app.route('/api/agreements', methods=['GET'])
+@require_auth
+def list_agreements():
+    """Past agreements, most recent first, filtered by name or registration."""
+    if not db.is_enabled():
+        return jsonify({
+            'success': False,
+            'error': 'History is not set up yet.',
+            'agreements': []
+        }), 503
+
+    try:
+        return jsonify({
+            'success': True,
+            'agreements': db.list_agreements(
+                search=request.args.get('search', ''),
+                limit=request.args.get('limit', 50),
+                offset=request.args.get('offset', 0),
+            )
+        })
+    except Exception as e:
+        print(f"Error listing agreements: {e}")
+        return jsonify({'success': False, 'error': 'Could not load history.'}), 500
+
+
+@app.route('/api/agreements/<agreement_id>/pdf', methods=['GET'])
+@require_auth
+def download_agreement(agreement_id):
+    """Re-download the exact PDF that was produced at the time."""
+    try:
+        filename, pdf_bytes = db.get_pdf(agreement_id)
+    except Exception as e:
+        print(f"Error fetching agreement {agreement_id}: {e}")
+        return jsonify({'success': False, 'error': 'Could not load agreement.'}), 500
+
+    if not pdf_bytes:
+        return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
+
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=filename
+    )
+
+
+@app.route('/api/agreements/<agreement_id>/form', methods=['GET'])
+@require_auth
+def agreement_form_data(agreement_id):
+    """The submitted values, for starting a repeat hire. Signatures excluded."""
+    try:
+        form_data = db.get_form_data(agreement_id)
+    except Exception as e:
+        print(f"Error fetching form data {agreement_id}: {e}")
+        return jsonify({'success': False, 'error': 'Could not load agreement.'}), 500
+
+    if form_data is None:
+        return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
+
+    return jsonify({'success': True, 'form_data': form_data})
+
+
+@app.route('/api/agreements/<agreement_id>', methods=['DELETE'])
+@require_auth
+def delete_agreement(agreement_id):
+    """Erase an agreement, for a data protection request."""
+    try:
+        deleted = db.delete_agreement(agreement_id)
+    except Exception as e:
+        print(f"Error deleting agreement {agreement_id}: {e}")
+        return jsonify({'success': False, 'error': 'Could not delete agreement.'}), 500
+
+    if not deleted:
+        return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
+
+    print(f"Agreement {agreement_id} deleted by '{request.user_id}'")
+    return jsonify({'success': True})
 
 
 def format_date_uk(value):
