@@ -17,6 +17,7 @@ generation down.
 import os
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
 try:
     import psycopg2
@@ -52,8 +53,13 @@ CREATE TABLE IF NOT EXISTS agreements (
     hire_start  text        NOT NULL DEFAULT '',
     filename    text        NOT NULL,
     pdf         bytea       NOT NULL,
-    form_data   jsonb       NOT NULL DEFAULT '{}'::jsonb
+    form_data   jsonb       NOT NULL DEFAULT '{}'::jsonb,
+    ended_at    timestamptz
 );
+
+-- The table already exists in production, where CREATE TABLE IF NOT EXISTS is
+-- a no-op, so new columns have to be added explicitly.
+ALTER TABLE agreements ADD COLUMN IF NOT EXISTS ended_at timestamptz;
 CREATE INDEX IF NOT EXISTS agreements_created_at_idx
     ON agreements (created_at DESC);
 CREATE INDEX IF NOT EXISTS agreements_hirer_name_idx
@@ -167,7 +173,7 @@ def list_agreements(search='', limit=50, offset=0):
         cur.execute(
             f"""
             SELECT id, created_at, hirer_name, vehicle_reg, make_model,
-                   hire_start, filename
+                   hire_start, filename, ended_at
             FROM agreements {where}
             ORDER BY created_at DESC
             LIMIT %s OFFSET %s
@@ -178,6 +184,7 @@ def list_agreements(search='', limit=50, offset=0):
 
     for row in rows:
         row['created_at'] = row['created_at'].isoformat()
+        row['ended_at'] = row['ended_at'].isoformat() if row['ended_at'] else None
     return rows
 
 
@@ -201,6 +208,30 @@ def get_form_data(agreement_id):
                     (agreement_id,))
         row = cur.fetchone()
     return row[0] if row else None
+
+
+def set_ended(agreement_id, ended):
+    """
+    Mark a hire as finished, or put it back to running.
+
+    Ending records the moment the button was pressed. Reopening exists because
+    the button will eventually be pressed on the wrong agreement, and without a
+    way back the only remedy would be deleting the record.
+
+    Returns the stored timestamp, '' when reopened, or None if there is no such
+    agreement.
+    """
+    if not is_enabled():
+        return None
+    with connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "UPDATE agreements SET ended_at = %s WHERE id = %s RETURNING ended_at",
+            (datetime.now(timezone.utc) if ended else None, agreement_id),
+        )
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return row[0].isoformat() if row[0] else ''
 
 
 def delete_agreement(agreement_id):

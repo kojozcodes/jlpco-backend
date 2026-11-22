@@ -343,6 +343,31 @@ def agreement_form_data(agreement_id):
     return jsonify({'success': True, 'form_data': form_data})
 
 
+@app.route('/api/agreements/<agreement_id>/end', methods=['POST', 'DELETE'])
+@require_auth
+def end_agreement(agreement_id):
+    """
+    Mark a hire as finished, or put it back to running.
+
+    The end is recorded against the archived record and the stored PDF is left
+    alone. That PDF is what the hirer signed, and writing an end date onto it
+    afterwards would alter a signed contract.
+    """
+    ending = request.method == 'POST'
+    try:
+        ended_at = db.set_ended(agreement_id, ending)
+    except Exception as e:
+        print(f"Error updating agreement {agreement_id}: {e}")
+        return jsonify({'success': False, 'error': 'Could not update agreement.'}), 500
+
+    if ended_at is None:
+        return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
+
+    print(f"Agreement {agreement_id} "
+          f"{'ended' if ending else 'reopened'} by '{request.user_id}'")
+    return jsonify({'success': True, 'ended_at': ended_at or None})
+
+
 @app.route('/api/agreements/<agreement_id>', methods=['DELETE'])
 @require_auth
 def delete_agreement(agreement_id):
