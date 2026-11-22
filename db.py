@@ -73,6 +73,24 @@ CREATE INDEX IF NOT EXISTS agreements_vehicle_reg_idx
 """
 
 
+def describe_error(error):
+    """
+    An exception as one line that is safe to log.
+
+    Postgres adds a DETAIL to some errors that spells out the whole row it was
+    given ("Failing row contains ..."), and every row here is a hirer's
+    personal details: name, address, date of birth, NI and licence numbers.
+    Only the primary message is kept, which names the problem and the column
+    but not the values. Anything that is not a database error is logged as it
+    is.
+    """
+    primary = getattr(getattr(error, 'diag', None), 'message_primary', None)
+    if primary:
+        code = getattr(error, 'pgcode', None)
+        return f"{type(error).__name__}{f' ({code})' if code else ''}: {primary}"
+    return f"{type(error).__name__}: {error}"
+
+
 def is_enabled():
     """Whether there is an archive to talk to."""
     return bool(DATABASE_URL) and psycopg2 is not None
@@ -122,7 +140,7 @@ def init_schema():
         return True
     except Exception as e:
         _ready = False
-        print(f"Could not prepare agreement history: {e}")
+        print(f"Could not prepare agreement history: {describe_error(e)}")
         return False
 
 
@@ -156,7 +174,7 @@ def save_agreement(form_data, pdf_bytes, filename, created_by='admin'):
         purge_expired()
         return agreement_id
     except Exception as e:
-        print(f"Could not archive agreement: {e}")
+        print(f"Could not archive agreement: {describe_error(e)}")
         return None
 
 
@@ -303,5 +321,5 @@ def purge_expired():
                 print(f"Purged {cur.rowcount} agreement(s) past retention.")
             return cur.rowcount
     except Exception as e:
-        print(f"Could not purge expired agreements: {e}")
+        print(f"Could not purge expired agreements: {describe_error(e)}")
         return 0
