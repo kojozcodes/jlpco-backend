@@ -19,6 +19,8 @@ from pypdf import PdfReader, PdfWriter
 from reportlab.lib.colors import HexColor, black
 from reportlab.pdfgen import canvas
 
+from pdf_generator import signature_block
+
 # Matches the hire agreement: body margins, label cell, value cell, row pitch.
 LEFT, RIGHT = 46.25, 551.0
 LABEL_X, LABEL_W = 59.75, 169.5
@@ -32,23 +34,19 @@ BOLD_FONT = "Helvetica-Bold"
 NOTE_LINES = 5
 NOTE_LINE_GAP = 22
 
-# Lifted from the agreement template, so the merged file has its signature
-# block in exactly the same place on every page. The block there is a two row
-# table: the rule a signature sits on is the line between the rows, and the
-# caption is centred in the row beneath it.
-SIGNATURE_LINE_Y = 53.15
-CAPTION_BASELINE_Y = 37.80
-CAPTION_FONT_SIZE = 10
-# Sized to fill the narrowest slot, so both signatures render at the same size
-# and sit as prominently as the ones on the agreement's own pages.
+# Read from the agreement template rather than written down, the same as every
+# other position in these documents. The end page is generated rather than
+# overlaid, so it draws the block itself, but at the template's own measurements
+# so it lands in the same place as the pages it is merged onto.
 SIGNATURE_WIDTH = 108
 SIGNATURE_HEIGHT = 36
+CAPTION_FONT_SIZE = 10
 
-SIGNATURE_SLOTS = (
-    (42.50, 152.75, "Hirer Signature", 'hirer_signature'),
-    (164.75, 245.00, "Date", None),
-    (262.25, 443.75, "Lessor Signature (JL PCO Limited)", 'lessor_signature'),
-    (455.75, 551.00, "Date", None),
+SIGNATURE_CAPTIONS = (
+    ('Hirer Signature', 'hirer_signature'),
+    ('Date', None),
+    ('Lessor Signature (JL PCO Limited)', 'lessor_signature'),
+    ('Date', None),
 )
 
 
@@ -140,23 +138,28 @@ def _draw_notes(c, page_height, y_top, notes):
     return y_top + height
 
 
-def _draw_signatures(c, data, save_image):
-    """The agreement's own signature block, in the agreement's own position."""
+def _draw_signatures(c, data, template_path, save_image):
+    """The agreement's own signature block, at the agreement's own measurements."""
+    block = signature_block(template_path, 1)
+    if not block:
+        print("Could not find the signature block in the template.")
+        return
+    rule_y, caption_y, slots = block
     date = data.get('ended_date', '')
 
-    for x0, x1, caption, signature_key in SIGNATURE_SLOTS:
+    for (x0, x1), (caption, signature_key) in zip(slots, SIGNATURE_CAPTIONS):
         c.setStrokeColor(black)
         c.setLineWidth(0.75)
-        c.line(x0, SIGNATURE_LINE_Y, x1, SIGNATURE_LINE_Y)
+        c.line(x0, rule_y, x1, rule_y)
 
         c.setFillColor(black)
         c.setFont(BODY_FONT, CAPTION_FONT_SIZE)
-        c.drawCentredString((x0 + x1) / 2, CAPTION_BASELINE_Y, caption)
+        c.drawCentredString((x0 + x1) / 2, caption_y, caption)
 
         if signature_key is None:
             if date:
-                c.setFont(BODY_FONT, 9)
-                c.drawCentredString((x0 + x1) / 2, SIGNATURE_LINE_Y + 6, date)
+                c.setFont(BODY_FONT, CAPTION_FONT_SIZE)
+                c.drawCentredString((x0 + x1) / 2, rule_y + 6, date)
             continue
 
         signature = data.get(signature_key)
@@ -166,14 +169,14 @@ def _draw_signatures(c, data, save_image):
         path = save_image(signature)
         if not path:
             continue
-        # Centred over its own line, and the same size in every slot. The
-        # slots are different widths, so a signature drawn to fill each one
-        # would come out bigger for the lessor than the hirer.
-        box_x = x0 + ((x1 - x0) - SIGNATURE_WIDTH) / 2
         try:
-            c.drawImage(path, box_x, SIGNATURE_LINE_Y + 2,
-                        width=SIGNATURE_WIDTH, height=SIGNATURE_HEIGHT,
-                        preserveAspectRatio=True, anchor='s', mask='auto')
+            # Centred on its own line and the same size in every slot: the
+            # slots differ in width, so one scaled to fill each would print
+            # noticeably larger for the lessor than the hirer.
+            box_x = x0 + ((x1 - x0) - SIGNATURE_WIDTH) / 2
+            c.drawImage(path, box_x, rule_y + 2, width=SIGNATURE_WIDTH,
+                        height=SIGNATURE_HEIGHT, preserveAspectRatio=True,
+                        anchor='s', mask='auto')
         except Exception:
             pass
         finally:
@@ -244,7 +247,7 @@ def build_end_page(data, template_path, save_image):
                  "Both parties confirm the vehicle condition and deposit figures "
                  "recorded above.")
 
-    _draw_signatures(c, data, save_image)
+    _draw_signatures(c, data, template_path, save_image)
 
     c.save()
     return buffer.getvalue()

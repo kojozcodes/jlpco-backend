@@ -52,15 +52,24 @@ EQUIPMENT_BASELINE_LIFT = 0.89
 # belongs to rather than near it. The rule each one sits on is the line between
 # the two rows of that block, 15.35pt above the caption's baseline.
 SIGNATURE_CAPTION = 'hirer signature'
-SIGNATURE_RULE_LIFT = 15.35
 SIGNATURE_WIDTH = 108
 SIGNATURE_HEIGHT = 36
-SIGNATURE_SLOTS = (
-    (42.50, 152.75, 'hirer_signature', None),
-    (164.75, 245.00, None, 'hirer_sig_date'),
-    (262.25, 443.75, 'lessor_signature', None),
-    (455.75, 551.00, None, 'lessor_sig_date'),
+
+# Narrow cells sit between the signature columns as spacers rather than slots.
+SIGNATURE_MIN_SLOT_WIDTH = 40
+
+# What each column of the block holds, left to right.
+SIGNATURE_FIELDS = (
+    ('hirer_signature', None),
+    (None, 'hirer_sig_date'),
+    ('lessor_signature', None),
+    (None, 'lessor_sig_date'),
 )
+
+# Used only if the block cannot be found in the template.
+FALLBACK_SIGNATURE_RULE_Y = 53.15
+FALLBACK_SIGNATURE_SLOTS = ((42.50, 152.75), (164.75, 245.00),
+                            (262.25, 443.75), (455.75, 551.00))
 
 # A tapped point on the frontend's car_diagram.png mapped onto the diagram
 # embedded in the template. Vertical framing of the two images is identical, so
@@ -376,19 +385,65 @@ def draw_equipment_fields(c, data, template_path, page_num):
             c.drawString(x, baseline + EQUIPMENT_BASELINE_LIFT, str(value))
 
 
+@lru_cache(maxsize=16)
+def signature_block(template_path, page_num):
+    """
+    The footer's signature columns and the rule they sit on, measured from the
+    template rather than written down here.
+
+    The block is a two row table printed identically on every page: a signature
+    sits on the line between the rows and its caption is centred in the row
+    beneath. Reading it means a template whose footer moves or whose columns
+    change width keeps working, the same as every other field.
+
+    Returns (rule_y, caption_y, ((x0, x1), ...)) or None.
+    """
+    caption = next((y for _, y, text in page_lines(template_path, page_num)
+                    if SIGNATURE_CAPTION in text), None)
+    if caption is None:
+        return None
+
+    try:
+        page = PdfReader(template_path).pages[page_num - 1]
+    except Exception:
+        return None
+
+    cells = []
+
+    def before(op, args, cm, tm):
+        if op != b're':
+            return
+        try:
+            x, y, w, h = (float(a) for a in args)
+        except (TypeError, ValueError):
+            return
+        x, w = x * cm[0] + cm[4], w * cm[0]
+        y, h = y * cm[3] + cm[5], h * cm[3]
+        bottom = min(y, y + h)
+        # the row resting directly on top of the caption, ignoring the
+        # spacer cells between the columns
+        if w > SIGNATURE_MIN_SLOT_WIDTH and 0 < bottom - caption < 30:
+            cells.append((round(x, 2), round(x + w, 2), round(bottom, 2)))
+
+    page.extract_text(visitor_operand_before=before)
+    cells = sorted(set(cells))
+    if len(cells) < len(SIGNATURE_FIELDS):
+        return None
+
+    return (min(c[2] for c in cells), caption,
+            tuple((c[0], c[1]) for c in cells))
+
+
 def draw_signatures(c, data, template_path=None, page_num=None):
     """Draw signatures and dates on the footer's printed lines."""
 
-    rule_y = None
-    if template_path and page_num:
-        caption = next((y for _, y, text in page_lines(template_path, page_num)
-                        if SIGNATURE_CAPTION in text), None)
-        if caption is not None:
-            rule_y = caption + SIGNATURE_RULE_LIFT
-    if rule_y is None:
-        rule_y = convert_y(788.74)
+    block = signature_block(template_path, page_num) if template_path else None
+    if block:
+        rule_y, _, slots = block
+    else:
+        rule_y, slots = FALLBACK_SIGNATURE_RULE_Y, FALLBACK_SIGNATURE_SLOTS
 
-    for x0, x1, signature_key, date_key in SIGNATURE_SLOTS:
+    for (x0, x1), (signature_key, date_key) in zip(slots, SIGNATURE_FIELDS):
         if date_key:
             date = data.get(date_key, '')
             if date:
