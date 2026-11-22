@@ -54,12 +54,16 @@ CREATE TABLE IF NOT EXISTS agreements (
     filename    text        NOT NULL,
     pdf         bytea       NOT NULL,
     form_data   jsonb       NOT NULL DEFAULT '{}'::jsonb,
-    ended_at    timestamptz
+    ended_at    timestamptz,
+    end_pdf     bytea,
+    end_data    jsonb
 );
 
 -- The table already exists in production, where CREATE TABLE IF NOT EXISTS is
 -- a no-op, so new columns have to be added explicitly.
 ALTER TABLE agreements ADD COLUMN IF NOT EXISTS ended_at timestamptz;
+ALTER TABLE agreements ADD COLUMN IF NOT EXISTS end_pdf  bytea;
+ALTER TABLE agreements ADD COLUMN IF NOT EXISTS end_data jsonb;
 CREATE INDEX IF NOT EXISTS agreements_created_at_idx
     ON agreements (created_at DESC);
 CREATE INDEX IF NOT EXISTS agreements_hirer_name_idx
@@ -188,15 +192,43 @@ def list_agreements(search='', limit=50, offset=0):
     return rows
 
 
-def get_pdf(agreement_id):
-    """(filename, bytes) for one agreement, or (None, None)."""
+def get_agreement(agreement_id):
+    """Everything about one agreement except the stored PDFs."""
     if not is_enabled():
-        return None, None
+        return None
+    with connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(
+            """
+            SELECT id, created_at, hirer_name, vehicle_reg, make_model,
+                   hire_start, filename, ended_at, form_data, end_data
+            FROM agreements WHERE id = %s
+            """,
+            (agreement_id,),
+        )
+        row = cur.fetchone()
+    if row:
+        row['created_at'] = row['created_at'].isoformat()
+        row['ended_at'] = row['ended_at'].isoformat() if row['ended_at'] else None
+    return row
+
+
+def get_pdf(agreement_id):
+    """
+    (filename, agreement bytes, end page bytes or None).
+
+    The two are kept apart rather than stored pre-merged. Each is exactly what
+    was produced at the time it was signed, and the single file the operator
+    sees is assembled from them on the way out.
+    """
+    if not is_enabled():
+        return None, None, None
     with connection() as conn, conn.cursor() as cur:
-        cur.execute("SELECT filename, pdf FROM agreements WHERE id = %s",
+        cur.execute("SELECT filename, pdf, end_pdf FROM agreements WHERE id = %s",
                     (agreement_id,))
         row = cur.fetchone()
-    return (row[0], bytes(row[1])) if row else (None, None)
+    if not row:
+        return None, None, None
+    return row[0], bytes(row[1]), (bytes(row[2]) if row[2] else None)
 
 
 def get_form_data(agreement_id):
@@ -210,28 +242,41 @@ def get_form_data(agreement_id):
     return row[0] if row else None
 
 
-def set_ended(agreement_id, ended):
-    """
-    Mark a hire as finished, or put it back to running.
-
-    Ending records the moment the button was pressed. Reopening exists because
-    the button will eventually be pressed on the wrong agreement, and without a
-    way back the only remedy would be deleting the record.
-
-    Returns the stored timestamp, '' when reopened, or None if there is no such
-    agreement.
-    """
+def save_end(agreement_id, ended_at, end_data, end_pdf):
+    """Record that a hire finished, with the page produced for it."""
     if not is_enabled():
         return None
     with connection() as conn, conn.cursor() as cur:
         cur.execute(
-            "UPDATE agreements SET ended_at = %s WHERE id = %s RETURNING ended_at",
-            (datetime.now(timezone.utc) if ended else None, agreement_id),
+            """
+            UPDATE agreements
+            SET ended_at = %s, end_data = %s, end_pdf = %s
+            WHERE id = %s RETURNING ended_at
+            """,
+            (ended_at, Json(end_data), psycopg2.Binary(end_pdf), agreement_id),
         )
         row = cur.fetchone()
-    if row is None:
-        return None
-    return row[0].isoformat() if row[0] else ''
+    return row[0].isoformat() if row and row[0] else None
+
+
+def clear_end(agreement_id):
+    """
+    Put a hire back to running.
+
+    Needed because the button will eventually be pressed on the wrong
+    agreement, and without a way back the only remedy would be deleting the
+    record. The end page goes with it, so a reopened hire reads as it did
+    before it was ended.
+    """
+    if not is_enabled():
+        return False
+    with connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "UPDATE agreements SET ended_at = NULL, end_data = NULL, "
+            "end_pdf = NULL WHERE id = %s",
+            (agreement_id,),
+        )
+        return cur.rowcount > 0
 
 
 def delete_agreement(agreement_id):

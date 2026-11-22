@@ -457,28 +457,35 @@ def report_missing_fields(data, template_path, page_count):
               "not printed.")
 
 
+def resolve_template_path():
+    """
+    Where the agreement template lives, preferring the updated one.
+
+    Shared so the end of hire page is built against the same file the agreement
+    itself uses, and takes its page size and logo from it.
+    """
+    possible_paths = [
+        'template_updated.pdf',
+        'template.pdf',
+        '/app/template_updated.pdf',
+        '/app/template.pdf',
+        os.path.join(os.path.dirname(__file__), 'template_updated.pdf'),
+        os.path.join(os.path.dirname(__file__), 'template.pdf'),
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path
+    raise FileNotFoundError(
+        "Template PDF not found. Please upload template_updated.pdf to the "
+        "backend folder."
+    )
+
+
 def generate_hire_agreement_pdf_mobile(data, output_path, template_path=None):
     """Generate the PCO Hire Agreement PDF - Mobile Version"""
 
-    # Find template PDF (prioritize template_updated.pdf)
     if template_path is None:
-        possible_paths = [
-            'template_updated.pdf',  # ✅ NEW template first
-            'template.pdf',          # Fallback to old
-            '/app/template_updated.pdf',
-            '/app/template.pdf',
-            os.path.join(os.path.dirname(__file__), 'template_updated.pdf'),
-            os.path.join(os.path.dirname(__file__), 'template.pdf'),
-        ]
-
-        for path in possible_paths:
-            if os.path.exists(path):
-                template_path = path
-                print(f"✅ Using template: {path}")
-                break
-
-        if template_path is None:
-            raise FileNotFoundError("Template PDF not found. Please upload template_updated.pdf to backend folder.")
+        template_path = resolve_template_path()
 
     # Read the template PDF
     template_reader = PdfReader(template_path)

@@ -9,10 +9,13 @@ import os
 import tempfile
 import base64
 from io import BytesIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from PIL import Image
-from pdf_generator import generate_hire_agreement_pdf_mobile
+from pdf_generator import (generate_hire_agreement_pdf_mobile,
+                           resolve_template_path,
+                           save_pil_image_to_temp as save_signature_to_temp)
 import db
+import end_document
 import traceback
 import bcrypt
 import secrets
@@ -311,13 +314,22 @@ def list_agreements():
 def download_agreement(agreement_id):
     """Re-download the exact PDF that was produced at the time."""
     try:
-        filename, pdf_bytes = db.get_pdf(agreement_id)
+        filename, pdf_bytes, end_pdf = db.get_pdf(agreement_id)
     except Exception as e:
         print(f"Error fetching agreement {agreement_id}: {e}")
         return jsonify({'success': False, 'error': 'Could not load agreement.'}), 500
 
     if not pdf_bytes:
         return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
+
+    # One file, assembled on the way out. An ended hire reads as the agreement
+    # followed by its end page, while each half stays stored exactly as it was
+    # produced.
+    if end_pdf:
+        try:
+            pdf_bytes = end_document.merge(pdf_bytes, end_pdf)
+        except Exception as e:
+            print(f"Could not merge the end page for {agreement_id}: {e}")
 
     return send_file(
         BytesIO(pdf_bytes),
@@ -347,25 +359,71 @@ def agreement_form_data(agreement_id):
 @require_auth
 def end_agreement(agreement_id):
     """
-    Mark a hire as finished, or put it back to running.
+    Finish a hire, or put it back to running.
 
-    The end is recorded against the archived record and the stored PDF is left
-    alone. That PDF is what the hirer signed, and writing an end date onto it
-    afterwards would alter a signed contract.
+    Ending produces an End of Hire page which is kept alongside the agreement
+    and merged onto the back of it when the file is opened. The agreement's own
+    pages are never rewritten: it is what the hirer signed.
     """
-    ending = request.method == 'POST'
-    try:
-        ended_at = db.set_ended(agreement_id, ending)
-    except Exception as e:
-        print(f"Error updating agreement {agreement_id}: {e}")
-        return jsonify({'success': False, 'error': 'Could not update agreement.'}), 500
+    if request.method == 'DELETE':
+        try:
+            reopened = db.clear_end(agreement_id)
+        except Exception as e:
+            print(f"Error reopening agreement {agreement_id}: {e}")
+            return jsonify({'success': False, 'error': 'Could not reopen agreement.'}), 500
+        if not reopened:
+            return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
+        print(f"Agreement {agreement_id} reopened by '{request.user_id}'")
+        return jsonify({'success': True, 'ended_at': None})
 
-    if ended_at is None:
+    data = request.json or {}
+
+    try:
+        agreement = db.get_agreement(agreement_id)
+    except Exception as e:
+        print(f"Error loading agreement {agreement_id}: {e}")
+        return jsonify({'success': False, 'error': 'Could not load agreement.'}), 500
+
+    if not agreement:
         return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
 
-    print(f"Agreement {agreement_id} "
-          f"{'ended' if ending else 'reopened'} by '{request.user_id}'")
-    return jsonify({'success': True, 'ended_at': ended_at or None})
+    ended_at = datetime.now(timezone.utc)
+    form_data = agreement.get('form_data') or {}
+
+    end_data = {
+        'hirer_name': agreement['hirer_name'],
+        'vehicle_reg': agreement['vehicle_reg'],
+        'make_model': agreement['make_model'],
+        'hire_start': format_date_uk(form_data.get('hire_start', '')),
+        'ended_at_display': ended_at.strftime('%d/%m/%Y %H:%M'),
+        'ended_date': ended_at.strftime('%d/%m/%Y'),
+        'return_notes': data.get('return_notes', ''),
+        'deposit_amount': data.get('deposit_amount',
+                                   form_data.get('deposit_amount', '')),
+        'deposit_withheld': data.get('deposit_withheld', ''),
+        'deposit_returned': data.get('deposit_returned', ''),
+        'deduction_reason': data.get('deduction_reason', ''),
+    }
+
+    try:
+        page = end_document.build_end_page(
+            dict(end_data,
+                 hirer_signature=process_signature(data.get('hirer_signature')),
+                 lessor_signature=process_signature(data.get('lessor_signature'))),
+            resolve_template_path(),
+            save_signature_to_temp,
+        )
+        stored = db.save_end(agreement_id, ended_at, end_data, page)
+    except Exception as e:
+        print(f"Error ending agreement {agreement_id}: {e}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': 'Could not end agreement.'}), 500
+
+    if stored is None:
+        return jsonify({'success': False, 'error': 'Agreement not found.'}), 404
+
+    print(f"Agreement {agreement_id} ended by '{request.user_id}'")
+    return jsonify({'success': True, 'ended_at': stored})
 
 
 @app.route('/api/agreements/<agreement_id>', methods=['DELETE'])
