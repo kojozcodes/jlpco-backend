@@ -303,8 +303,16 @@ def wrap_to_width(text, max_width, max_lines):
 
 
 def format_address(address, max_width):
-    """Flatten a multi-line address onto the single row the template gives it."""
-    parts = [part.strip() for part in address.replace('\n', ', ').split(', ')]
+    """
+    Flatten a multi-line address onto the single row the template gives it.
+
+    Commas and line breaks are both treated as separators and the parts
+    rejoined with ", ". People often end each line of an address with a comma
+    and then start a new line, and turning only the line break into ", "
+    printed that as "1 Test Street,, Watford". A comma typed without a space,
+    as in "Flat 2,1 Test Street", comes out spaced the same way.
+    """
+    parts = (part.strip() for part in re.split(r'[,\r\n]', address))
     return truncate_to_width(', '.join(p for p in parts if p), max_width)
 
 
