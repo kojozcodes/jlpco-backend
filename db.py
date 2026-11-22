@@ -37,6 +37,10 @@ RETENTION_YEARS = int(os.environ.get('AGREEMENT_RETENTION_YEARS', '6'))
 # the signed document does not already serve.
 EXCLUDED_FIELDS = ('hirer_signature', 'lessor_signature')
 
+# Set by init_schema. Reports whether the archive is configured AND reachable,
+# which is not the same as DATABASE_URL being present.
+_ready = False
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS agreements (
     id          text PRIMARY KEY,
@@ -64,6 +68,15 @@ def is_enabled():
     return bool(DATABASE_URL) and psycopg2 is not None
 
 
+def status():
+    """How the archive is doing, for the health check."""
+    if not DATABASE_URL:
+        return 'not configured'
+    if psycopg2 is None:
+        return 'driver missing'
+    return 'connected' if _ready else 'unreachable'
+
+
 @contextmanager
 def connection():
     """
@@ -86,16 +99,19 @@ def connection():
 
 def init_schema():
     """Create the table if it is missing. Safe to call on every boot."""
+    global _ready
     if not is_enabled():
         print("No DATABASE_URL set - agreement history is disabled.")
         return False
     try:
         with connection() as conn, conn.cursor() as cur:
             cur.execute(SCHEMA)
+        _ready = True
         print(f"Agreement history ready (retention: "
               f"{RETENTION_YEARS or 'indefinite'} years).")
         return True
     except Exception as e:
+        _ready = False
         print(f"Could not prepare agreement history: {e}")
         return False
 

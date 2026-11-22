@@ -100,7 +100,14 @@ def require_auth(f):
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({'status': 'ok', 'message': 'JL PCO Backend Running - WITH NEW FIELDS'})
+    # 'history' says whether saved agreements are available, so a deployment
+    # can be checked without signing in. Deliberately just a state name: this
+    # endpoint is unauthenticated.
+    return jsonify({
+        'status': 'ok',
+        'message': 'JL PCO Backend Running - WITH NEW FIELDS',
+        'history': db.status(),
+    })
 
 
 @app.route('/api/login', methods=['POST'])
